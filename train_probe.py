@@ -48,7 +48,7 @@ def main(args):
     trained_model = trainer.train(probe_model, tf_data)
 
     args.output_dir.mkdir(exist_ok=True)
-    trained_model.save(str(args.output_dir))
+    trained_model.save_weights(args.output_dir)
 
 
 if __name__ == '__main__':
