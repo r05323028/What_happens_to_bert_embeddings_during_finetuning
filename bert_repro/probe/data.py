@@ -32,11 +32,11 @@ class ProbeDataset:
         self._graph = nx.Graph()
 
     def traverse_tree(self, root):
-        self._graph.add_node(root.token['id'])
+        self._graph.add_node(root.token['id'] - 1)
 
         for child in root.children:
-            self._graph.add_node(child.token['id'])
-            self._graph.add_edge(root.token['id'], child.token['id'])
+            self._graph.add_node(child.token['id'] - 1)
+            self._graph.add_edge(root.token['id'] - 1, child.token['id'] - 1)
             self.traverse_tree(child)
 
     def data_generator(self, sentences) -> Iterator:
@@ -48,8 +48,15 @@ class ProbeDataset:
 
             for start, targets in nx.all_pairs_shortest_path_length(
                     self._graph):
-                for target, distance in targets.items():
-                    label_matrix[start - 1, target - 1] = distance
+                try:
+                    for target, distance in targets.items():
+                        label_matrix[start, target] = distance
+
+                except:
+                    print(
+                        f'Catch invalid shape: {label_matrix.shape, start, target}'
+                    )
+                    continue
 
             yield (sentence.tokens, label_matrix)
             self._graph.clear()
@@ -57,7 +64,9 @@ class ProbeDataset:
     def build_pairs_distance_generator(self,
                                        bert,
                                        tokenizer,
-                                       batch_size: int = 32) -> Iterator:
+                                       batch_size: int = 32,
+                                       layer_index: int = -1,
+                                       return_length: bool = True) -> Iterator:
         '''Builds probe model pairs distance generator
         '''
         with open(self._ud_path, 'r', encoding='utf-8') as file:
@@ -77,14 +86,18 @@ class ProbeDataset:
                                    return_tensors='tf',
                                    return_length=True,
                                    add_special_tokens=False)
+                lengths = inputs['length']
                 max_length = tf.reduce_max(inputs['length']).numpy()
                 label_matrices = label_matrices_padding(
                     label_matrices, max_length)
                 del inputs['length']  # delete key for feeding model correctly
                 outputs = bert(**inputs)
-                embeddings = outputs.last_hidden_state
+                embeddings = outputs.hidden_states[layer_index]
 
-                yield embeddings, label_matrices
+                if return_length:
+                    yield embeddings, label_matrices, lengths
+                else:
+                    yield embeddings, label_matrices
                 counter = 0
                 sents, label_matrices = [], []
 

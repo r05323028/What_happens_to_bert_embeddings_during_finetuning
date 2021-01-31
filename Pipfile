@@ -23,6 +23,7 @@ tensorflow-datasets = "*"
 tqdm = "*"
 conllu = "*"
 networkx = "*"
+scipy = "*"
 
 [requires]
 python_version = "3.7"

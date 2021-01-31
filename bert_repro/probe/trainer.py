@@ -4,6 +4,17 @@ import tensorflow as tf
 from tqdm import tqdm
 
 
+def build_label_mask(length, max_length):
+    outputs = []
+
+    for l in length:
+        mask = tf.ones((l, l))
+        outputs.append(tf.pad(mask,
+                              [[0, max_length - l], [0, max_length - l]]))
+
+    return outputs
+
+
 class ProbeTrainer:
     '''Probe Model Trainer
     '''
@@ -17,14 +28,15 @@ class ProbeTrainer:
         for _ in range(self._n_epochs):
             pbar = tqdm(train_dataset)
             for batch in pbar:
-                features, label_matrix = batch
-                sent_len = label_matrix.shape[1]
+                features, label_matrix, length = batch
+                max_length = label_matrix.shape[1]
+                label_mask = build_label_mask(length, max_length)
 
                 with tf.GradientTape() as tape:
                     distances = probe_model(features, training=True)
                     loss = tf.reduce_sum(
-                        tf.abs(distances - label_matrix)) / tf.square(
-                            float(sent_len))
+                        tf.abs(distances * label_mask - label_matrix *
+                               label_mask)) / tf.square(float(max_length))
 
                 pbar.set_description(f'Loss: {loss}')
 

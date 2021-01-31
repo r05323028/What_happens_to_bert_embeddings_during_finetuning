@@ -7,7 +7,7 @@ from pathlib import Path
 
 import conllu
 import tensorflow as tf
-from transformers import BertTokenizer, TFBertModel
+from transformers import BertTokenizer, TFBertModel, BertConfig
 
 from bert_repro.probe.data import ProbeDataset
 from bert_repro.probe.trainer import ProbeTrainer
@@ -26,6 +26,7 @@ def get_args():
     arg_parser.add_argument('--bert_model', default='bert-base-uncased')
     arg_parser.add_argument('--embedding_size', default=768, type=int)
     arg_parser.add_argument('--max_probe_rank', default=128, type=int)
+    arg_parser.add_argument('--learning_rate', default=0.00003, type=float)
     arg_parser.add_argument('--n_epochs', default=20, type=int)
 
     return arg_parser.parse_args()
@@ -35,20 +36,21 @@ def main(args):
     train_data = ProbeDataset(args.data_fp)
 
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-    bert = TFBertModel.from_pretrained(args.bert_model)
+    bert_config = BertConfig(output_hidden_states=True)
+    bert = TFBertModel.from_pretrained(args.bert_model, config=bert_config)
 
     probe_model = TwoWordProbe(args.embedding_size, args.max_probe_rank)
 
-    trainer = ProbeTrainer(args.n_epochs)
+    trainer = ProbeTrainer(args.n_epochs, learning_rate=args.learning_rate)
 
     tf_data = tf.data.Dataset.from_generator(
         lambda: train_data.build_pairs_distance_generator(bert, tokenizer),
-        output_types=(tf.float32, tf.float32))
+        output_types=(tf.float32, tf.float32, tf.int32))
 
     trained_model = trainer.train(probe_model, tf_data)
 
     args.output_dir.mkdir(exist_ok=True)
-    trained_model.save_weights(args.output_dir)
+    trained_model.save_weights(args.output_dir / 'model')
 
 
 if __name__ == '__main__':
