@@ -1,0 +1,18 @@
+FROM tensorflow/tensorflow:latest-gpu-jupyter
+
+EXPOSE 8888
+
+# install nodejs v12
+RUN curl -sL https://deb.nodesource.com/setup_12.x | bash - 
+RUN apt-get install -y nodejs
+
+# install python requirements
+RUN pip install jupyterlab plotly transformers tensorflow_datasets conllu networkx scipy tqdm click seaborn
+
+# install jupyterlab extensions
+RUN jupyter labextension install jupyterlab-plotly@4.14.3
+RUN jupyter labextension install @jupyter-widgets/jupyterlab-manager plotlywidget@4.14.3
+
+WORKDIR /bert_repro
+
+CMD python
